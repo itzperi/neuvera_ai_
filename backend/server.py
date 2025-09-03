@@ -295,8 +295,23 @@ async def get_tracking_events(current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    events = await db.tracking_events.find().sort("timestamp", -1).limit(100).to_list(100)
-    return events
+    try:
+        events = await db.tracking_events.find().sort("timestamp", -1).limit(100).to_list(100)
+        
+        # Convert MongoDB ObjectIds to strings for JSON serialization
+        serialized_events = []
+        for event in events:
+            if '_id' in event:
+                event['_id'] = str(event['_id'])
+            # Convert datetime objects to ISO strings
+            if 'timestamp' in event and hasattr(event['timestamp'], 'isoformat'):
+                event['timestamp'] = event['timestamp'].isoformat()
+            serialized_events.append(event)
+        
+        return serialized_events
+    except Exception as e:
+        logger.error(f"Admin events error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve events: {str(e)}")
 
 # Health check
 @api_router.get("/")
