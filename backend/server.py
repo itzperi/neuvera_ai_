@@ -123,7 +123,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # Authentication Routes
-@api_router.post("/auth/signup", response_model=UserResponse)
+@api_router.post("/auth/signup")
 async def signup(user_data: UserCreate):
     # Check if user exists
     existing_user = await db.users.find_one({"email": user_data.email})
@@ -140,11 +140,16 @@ async def signup(user_data: UserCreate):
     
     user_dict = user.dict()
     user_dict["password"] = hashed_password
-    user_dict["token"] = str(uuid.uuid4())
+    token = str(uuid.uuid4())
+    user_dict["token"] = token
     
     await db.users.insert_one(user_dict)
     
-    return UserResponse(**user.dict())
+    # Return token and user data like signin does
+    return {
+        "token": token,
+        "user": UserResponse(**user.dict())
+    }
 
 @api_router.post("/auth/signin")
 async def signin(login_data: UserLogin):
