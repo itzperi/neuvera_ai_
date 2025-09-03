@@ -254,41 +254,51 @@ async def get_admin_stats(current_user: User = Depends(get_current_user)):
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Get statistics
-    total_users = await db.users.count_documents({})
-    total_chats = await db.chats.count_documents({})
-    total_events = await db.tracking_events.count_documents({})
-    
-    # Get recent activity
-    recent_chats = await db.chats.find().sort("timestamp", -1).limit(10).to_list(10)
-    recent_events = await db.tracking_events.find().sort("timestamp", -1).limit(10).to_list(10)
-    
-    recent_activity = []
-    for chat in recent_chats:
-        recent_activity.append({
-            "type": "chat",
-            "timestamp": chat["timestamp"].isoformat(),
-            "user_id": chat["user_id"],
-            "data": {"message": chat["message"][:50] + "..."}
-        })
-    
-    for event in recent_events:
-        recent_activity.append({
-            "type": "event",
-            "timestamp": event["timestamp"].isoformat(),
-            "data": {"event_type": event["event_type"], "page_url": event["page_url"]}
-        })
-    
-    # Sort by timestamp
-    recent_activity.sort(key=lambda x: x["timestamp"], reverse=True)
-    recent_activity = recent_activity[:20]
-    
-    return AdminStats(
-        total_users=total_users,
-        total_chats=total_chats,
-        total_events=total_events,
-        recent_activity=recent_activity
-    )
+    try:
+        # Get statistics
+        total_users = await db.users.count_documents({})
+        total_chats = await db.chats.count_documents({})
+        total_events = await db.tracking_events.count_documents({})
+        
+        # Get recent activity
+        recent_chats = await db.chats.find().sort("timestamp", -1).limit(10).to_list(10)
+        recent_events = await db.tracking_events.find().sort("timestamp", -1).limit(10).to_list(10)
+        
+        recent_activity = []
+        for chat in recent_chats:
+            timestamp = chat.get("timestamp")
+            if hasattr(timestamp, 'isoformat'):
+                timestamp = timestamp.isoformat()
+            recent_activity.append({
+                "type": "chat",
+                "timestamp": timestamp,
+                "user_id": chat.get("user_id", "unknown"),
+                "data": {"message": (chat.get("message", "")[:50] + "...") if len(chat.get("message", "")) > 50 else chat.get("message", "")}
+            })
+        
+        for event in recent_events:
+            timestamp = event.get("timestamp")
+            if hasattr(timestamp, 'isoformat'):
+                timestamp = timestamp.isoformat()
+            recent_activity.append({
+                "type": "event",
+                "timestamp": timestamp,
+                "data": {"event_type": event.get("event_type", ""), "page_url": event.get("page_url", "")}
+            })
+        
+        # Sort by timestamp
+        recent_activity.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        recent_activity = recent_activity[:20]
+        
+        return AdminStats(
+            total_users=total_users,
+            total_chats=total_chats,
+            total_events=total_events,
+            recent_activity=recent_activity
+        )
+    except Exception as e:
+        logger.error(f"Admin stats error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve admin stats: {str(e)}")
 
 @api_router.get("/admin/events")
 async def get_tracking_events(current_user: User = Depends(get_current_user)):
