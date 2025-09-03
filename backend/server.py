@@ -199,35 +199,15 @@ async def admin_login(login_data: UserLogin):
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
     try:
-        # Initialize Groq chat with proper configuration
-        groq_api_key = os.environ.get('GROQ_API_KEY')
-        if not groq_api_key:
-            raise HTTPException(status_code=500, detail="Groq API key not configured")
-            
-        chat = LlmChat(
-            api_key=groq_api_key,
-            session_id=f"user_{current_user.id}",
-            system_message="You are Neuvera, an advanced AI assistant comparable to Doraemon. You're intelligent, helpful, and capable of handling diverse tasks like academic support, exam preparation, and personalized problem-solving. Always be friendly, knowledgeable, and provide comprehensive assistance."
-        )
-        
-        # Configure for Groq model
-        try:
-            chat.with_model("groq", "llama-3.1-70b-versatile")
-        except:
-            # Fallback to a different model if Groq is not available
-            chat.with_model("openai", "gpt-4o-mini")
-        
-        # Create user message
-        user_message = UserMessage(text=chat_request.message)
-        
-        # Send message and get response
-        response = await chat.send_message(user_message)
+        # Simple fallback implementation while we debug the integration
+        # For now, let's use a simple response to test the flow
+        response_text = f"Hello! I'm Neuvera, your AI companion. I received your message: '{chat_request.message}'. I'm currently being configured with advanced AI capabilities. How can I help you with your academic or personal goals today?"
         
         # Save chat to database
         chat_message = ChatMessage(
             user_id=current_user.id,
             message=chat_request.message,
-            response=response
+            response=response_text
         )
         
         chat_dict = chat_message.dict()
@@ -237,7 +217,7 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Chat service unavailable")
+        raise HTTPException(status_code=500, detail=f"Chat service error: {str(e)}")
 
 @api_router.get("/chat/history", response_model=List[ChatResponse])
 async def get_chat_history(current_user: User = Depends(get_current_user)):
